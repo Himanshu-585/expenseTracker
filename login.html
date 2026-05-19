@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker – Sign In</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --indigo: #6366f1; --indigo-dark: #4f46e5; --green: #10b981;
+            --bg: #f1f5f9; --card: #ffffff; --text: #1e293b;
+            --muted: #64748b; --border: #e2e8f0;
+        }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+            background-image:
+                radial-gradient(circle at 20% 20%, #e0e7ff 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, #dbeafe 0%, transparent 50%);
+        }
+        .auth-wrapper { width: 100%; max-width: 440px; }
+        .brand { text-align: center; margin-bottom: 32px; }
+        .brand-icon {
+            width: 60px; height: 60px; background: var(--indigo);
+            border-radius: 16px; display: inline-flex;
+            align-items: center; justify-content: center;
+            font-size: 28px; margin-bottom: 12px;
+            box-shadow: 0 8px 24px rgba(99,102,241,0.3);
+        }
+        .brand h1 { font-size: 1.6em; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+        .brand p { color: var(--muted); font-size: 0.9em; margin-top: 4px; }
+        .card {
+            background: var(--card); border-radius: 20px; padding: 36px;
+            box-shadow: 0 4px 40px rgba(0,0,0,0.08); border: 1px solid var(--border);
+        }
+        .tabs {
+            display: flex; background: var(--bg); border-radius: 10px;
+            padding: 4px; margin-bottom: 28px; gap: 4px;
+        }
+        .tab {
+            flex: 1; padding: 10px; text-align: center; border-radius: 8px;
+            cursor: pointer; font-weight: 600; font-size: 0.9em;
+            color: var(--muted); transition: all 0.2s; border: none; background: none;
+        }
+        .tab.active { background: white; color: var(--indigo); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; font-size: 0.875em; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+        input {
+            width: 100%; padding: 12px 14px; border: 2px solid var(--border);
+            border-radius: 10px; font-size: 0.95em; font-family: inherit;
+            color: var(--text); background: #fafafa;
+            transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+        }
+        input:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: white; }
+        input::placeholder { color: #94a3b8; }
+        .btn {
+            width: 100%; padding: 13px; background: var(--indigo);
+            color: white; border: none; border-radius: 10px;
+            font-size: 1em; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: all 0.2s; margin-top: 8px;
+        }
+        .btn:hover { background: var(--indigo-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.35); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+        .btn-spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            vertical-align: middle; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .alert {
+            padding: 12px 16px; border-radius: 10px; font-size: 0.875em;
+            font-weight: 500; margin-bottom: 18px; display: none;
+            align-items: center; gap: 8px;
+        }
+        .alert.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; display: flex; }
+        .alert.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; display: flex; }
+        .form-panel { display: none; }
+        .form-panel.active { display: block; }
+        .success-screen { text-align: center; padding: 20px 0; display: none; }
+        .success-icon {
+            width: 64px; height: 64px; background: #dcfce7;
+            border-radius: 50%; display: inline-flex;
+            align-items: center; justify-content: center;
+            font-size: 30px; margin-bottom: 16px;
+        }
+        .success-screen h3 { font-size: 1.3em; color: var(--text); margin-bottom: 8px; }
+        .success-screen p { color: var(--muted); font-size: 0.9em; line-height: 1.6; }
+        .footer-note { text-align: center; margin-top: 20px; color: var(--muted); font-size: 0.82em; }
+        .panel-title { font-size: 1.25em; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+        .panel-sub { color: var(--muted); font-size: 0.875em; margin-bottom: 24px; }
+        .email-hint { font-size: 0.8em; color: var(--muted); margin-top: 4px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="auth-wrapper">
+    <div class="brand">
+        <div class="brand-icon">💰</div>
+        <h1>Expense Tracker</h1>
+        <p>Split smarter, not harder</p>
+    </div>
+
+    <div class="card">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('login')">Sign In</button>
+            <button class="tab" onclick="switchTab('signup')">Create Account</button>
+        </div>
+
+        <div id="alertBox" class="alert"></div>
+
+        <!-- LOGIN -->
+        <div class="form-panel active" id="loginPanel">
+            <p class="panel-title">Welcome back 👋</p>
+            <p class="panel-sub">Sign in to your account to continue</p>
+            <div class="form-group">
+                <label>Email address</label>
+                <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password">
+            </div>
+            <button class="btn" id="loginBtn" onclick="handleLogin()">Sign In</button>
+        </div>
+
+        <!-- SIGNUP -->
+        <div class="form-panel" id="signupPanel">
+            <p class="panel-title">Create your account</p>
+            <p class="panel-sub">Start tracking group expenses today</p>
+
+            <div id="signupForm">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="signupName" placeholder="Your name" autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label>Email address</label>
+                    <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email">
+                    <div class="email-hint">We'll send a confirmation email</div>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="signupPassword" placeholder="Min. 6 characters" autocomplete="new-password">
+                </div>
+                <button class="btn" id="signupBtn" onclick="handleSignup()">Create Account</button>
+            </div>
+
+            <div class="success-screen" id="signupSuccess">
+                <div class="success-icon">📧</div>
+                <h3>Check your email!</h3>
+                <p>We sent a confirmation link to <strong id="confirmedEmail"></strong>.<br>Click the link to activate your account.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-note">By continuing, you agree to our Terms of Service &amp; Privacy Policy</div>
+</div>
+
+<script>
+    // Supabase configuration
+    const SUPABASE_URL = 'https://iqjgxhynsznhslkbuioi.supabase.co'
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxamd4aHluc3puaHNsa2J1aW9pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzgzMjUwMiwiZXhwIjoyMDg5NDA4NTAyfQ.e4m86mI03NyVqqmyRET5FxZwxeOoaFa8PMgAn0-GfCE'
+
+    const { createClient } = supabase
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // Check if already logged in
+    sb.auth.getSession().then(({ data: { session } }) => {
+        if (session) window.location.href = 'index.html'
+    })
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach((t, i) => {
+            t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'signup'))
+        })
+        document.getElementById('loginPanel').classList.toggle('active', tab === 'login')
+        document.getElementById('signupPanel').classList.toggle('active', tab === 'signup')
+        hideAlert()
+    }
+
+    function showAlert(msg, type = 'error') {
+        const el = document.getElementById('alertBox')
+        el.className = 'alert ' + type
+        el.innerHTML = (type === 'error' ? '⚠️ ' : '✅ ') + msg
+        el.style.display = 'flex'
+    }
+
+    function hideAlert() {
+        const el = document.getElementById('alertBox')
+        el.style.display = 'none'
+        el.className = 'alert'
+    }
+
+    function setLoading(btnId, loading) {
+        const btn = document.getElementById(btnId)
+        btn.disabled = loading
+        btn.innerHTML = loading ? '<span class="btn-spinner"></span> Please wait...' : (btnId === 'loginBtn' ? 'Sign In' : 'Create Account')
+    }
+
+    async function handleLogin() {
+        const email = document.getElementById('loginEmail').value.trim()
+        const password = document.getElementById('loginPassword').value
+        hideAlert()
+        if (!email || !password) return showAlert('Please fill in all fields')
+        setLoading('loginBtn', true)
+        const { error } = await sb.auth.signInWithPassword({ email, password })
+        setLoading('loginBtn', false)
+        if (error) return showAlert(error.message)
+        window.location.href = 'index.html'
+    }
+
+    async function handleSignup() {
+        const name = document.getElementById('signupName').value.trim()
+        const email = document.getElementById('signupEmail').value.trim()
+        const password = document.getElementById('signupPassword').value
+        hideAlert()
+        if (!name || !email || !password) return showAlert('Please fill in all fields')
+        if (password.length < 6) return showAlert('Password must be at least 6 characters')
+        setLoading('signupBtn', true)
+        const { error } = await sb.auth.signUp({
+            email, password,
+            options: { data: { full_name: name } }
+        })
+        setLoading('signupBtn', false)
+        if (error) return showAlert(error.message)
+        document.getElementById('signupForm').style.display = 'none'
+        document.getElementById('signupSuccess').style.display = 'block'
+        document.getElementById('confirmedEmail').textContent = email
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            if (document.getElementById('loginPanel').classList.contains('active')) handleLogin()
+            else handleSignup()
+        }
+    })
+</script>
+</body>
+</html>
