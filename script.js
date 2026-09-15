@@ -14,18 +14,47 @@ const CHART_COLORS = [
     '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'
 ]
 
-// Check if user is logged in
+// =====================
+// SANITIZATION HELPERS
+// =====================
+function escapeHtml(str) {
+    if (str === null || str === undefined) return ''
+    return String(str).replace(/[&<>"'`]/g, function(m) {
+        return ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+            '`': '&#96;'
+        })[m]
+    })
+}
+
+function sanitizeText(str) {
+    if (!str) return ''
+    return String(str).trim().slice(0, 500)
+}
+
+function sanitizeNumber(val) {
+    var n = parseFloat(val)
+    return isFinite(n) && n > 0 ? n : 0
+}
+
+// =====================
+// AUTH & INIT
+// =====================
 window.onload = async function() {
     try {
         const { data: { session }, error } = await sb.auth.getSession()
         if (error) throw error
-        
+
         if (!session) {
             window.location.href = 'login.html'
             return
         }
         currentUser = session.user
-        
+
         var theme = localStorage.getItem('theme')
         if (theme == 'dark') {
             document.body.classList.add('dark')
@@ -39,6 +68,9 @@ window.onload = async function() {
     }
 }
 
+// =====================
+// LOAD & RENDER GROUPS
+// =====================
 async function loadGroups() {
     try {
         const { data: groups, error } = await sb
@@ -46,7 +78,7 @@ async function loadGroups() {
             .select('*')
             .eq('user_id', currentUser.id)
             .order('created_at', { ascending: false })
-        
+
         if (error) throw error
         renderSidebar(groups || [])
     } catch (err) {
@@ -68,8 +100,8 @@ function renderSidebar(groups) {
         html += '<div class="group-item ' + activeClass + '">'
         html += '<h4>' + escapeHtml(g.name) + '</h4>'
         html += '<div style="display:flex; gap:6px; margin-top:8px;">'
-        html += '<button class="btn-green grp-open-btn" style="flex:1; padding:5px; font-size:0.85em;" data-id="' + g.id + '" data-name="' + escapeHtml(g.name) + '">Open</button>'
-        html += '<button class="btn-red grp-del-btn" style="padding:5px 10px; font-size:0.85em;" data-id="' + g.id + '">Delete</button>'
+        html += '<button class="btn-green grp-open-btn" style="flex:1; padding:5px; font-size:0.85em;" data-id="' + escapeHtml(String(g.id)) + '" data-name="' + escapeHtml(g.name) + '">Open</button>'
+        html += '<button class="btn-red grp-del-btn" style="padding:5px 10px; font-size:0.85em;" data-id="' + escapeHtml(String(g.id)) + '">Delete</button>'
         html += '</div></div>'
     }
     list.innerHTML = html
@@ -86,8 +118,9 @@ function renderSidebar(groups) {
     document.querySelectorAll('.grp-del-btn').forEach(function(btn) {
         btn.onclick = async function() {
             if (!confirm('Delete this group? All data will be lost!')) return
-            await sb.from('groups').delete().eq('id', btn.dataset.id)
-            if (currentGroup == btn.dataset.id) {
+            var gid = parseInt(btn.dataset.id)
+            await sb.from('groups').delete().eq('id', gid).eq('user_id', currentUser.id)
+            if (currentGroup == gid) {
                 currentGroup = null
                 currentGroupName = ''
                 document.getElementById('mainContent').innerHTML = '<div class="welcome-screen"><h2>👋 Welcome!</h2><p>Create a group to start tracking expenses</p></div>'
@@ -97,6 +130,9 @@ function renderSidebar(groups) {
     })
 }
 
+// =====================
+// GROUP DETAILS
+// =====================
 async function showGroupDetails() {
     if (!currentGroup) return
 
@@ -106,7 +142,7 @@ async function showGroupDetails() {
             .select('*')
             .eq('group_id', currentGroup)
             .order('name')
-        
+
         if (membersError) throw membersError
 
         const { data: expenses, error: expensesError } = await sb
@@ -114,7 +150,7 @@ async function showGroupDetails() {
             .select('*')
             .eq('group_id', currentGroup)
             .order('created_at', { ascending: false })
-        
+
         if (expensesError) throw expensesError
 
         const { data: messages, error: messagesError } = await sb
@@ -122,7 +158,7 @@ async function showGroupDetails() {
             .select('*')
             .eq('group_id', currentGroup)
             .order('created_at', { ascending: true })
-        
+
         if (messagesError) throw messagesError
 
         var total = expenses.reduce(function(s, e) { return s + e.amount }, 0)
@@ -152,7 +188,7 @@ async function showGroupDetails() {
         html += '<div class="section"><h3>Who Owes Whom</h3><div class="balance-list" id="balanceList"></div></div>'
         html += '<div class="section"><h3>Group Chat</h3><div class="chat-box">'
         html += '<div class="chat-messages" id="chatMessages"></div>'
-        html += '<div class="chat-input-row"><input type="text" id="chatInput" placeholder="Type a message..."><button id="sendMsgBtn">Send</button>'
+        html += '<div class="chat-input-row"><input type="text" id="chatInput" placeholder="Type a message..." maxlength="500"><button id="sendMsgBtn">Send</button>'
         html += '</div></div></div>'
 
         document.getElementById('mainContent').innerHTML = html
@@ -176,6 +212,11 @@ async function showGroupDetails() {
         }
         document.getElementById('sendMsgBtn').onclick = sendMsg
 
+        // Allow send on Enter key
+        document.getElementById('chatInput') && document.getElementById('chatInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') sendMsg()
+        })
+
         renderMembers(members)
         renderExpenses(expenses)
         renderBalances(members, expenses)
@@ -187,6 +228,9 @@ async function showGroupDetails() {
     }
 }
 
+// =====================
+// BUDGET
+// =====================
 function renderBudgetSection(total, budget) {
     if (budget <= 0) {
         return '<div class="budget-section"><div class="budget-header"><h4>🎯 Budget Goal</h4><span style="color:#6366f1; cursor:pointer;" onclick="document.getElementById(\'setBudgetOpenBtn\').click()">+ Set a budget</span></div><p style="font-size:0.85em; color:#94a3b8;">No budget set yet.</p></div>'
@@ -212,6 +256,9 @@ function renderBudgetSection(total, budget) {
         </div>`
 }
 
+// =====================
+// INSIGHTS
+// =====================
 function showRuleInsights(members, expenses, total, budget) {
     var el = document.getElementById('aiInsightsContent')
     if (!el) return
@@ -219,7 +266,7 @@ function showRuleInsights(members, expenses, total, budget) {
     var insights = generateInsights(members, expenses, total, budget)
     var html = '<div class="ai-insights-result">'
     insights.forEach(function(ins) {
-        html += '<div class="ai-insight-block"><strong>' + ins.title + '</strong>' + ins.body + '</div>'
+        html += '<div class="ai-insight-block"><strong>' + escapeHtml(ins.title) + '</strong>' + ins.body + '</div>'
     })
     html += '</div>'
     el.innerHTML = html
@@ -233,16 +280,16 @@ function generateInsights(members, expenses, total, budget) {
         categoryTotals[cat] = (categoryTotals[cat] || 0) + exp.amount
     })
     var topCat = Object.keys(categoryTotals).sort(function(a, b) { return categoryTotals[b] - categoryTotals[a] })[0]
-    if (topCat) insights.push({ title: '🍔 Top Category', body: 'Most spent on <strong>' + topCat + '</strong> — Rs.' + categoryTotals[topCat].toFixed(2) })
-    
+    if (topCat) insights.push({ title: '🍔 Top Category', body: 'Most spent on <strong>' + escapeHtml(topCat) + '</strong> — Rs.' + categoryTotals[topCat].toFixed(2) })
+
     var payerTotals = {}
     expenses.forEach(function(exp) { payerTotals[exp.paid_by] = (payerTotals[exp.paid_by] || 0) + exp.amount })
     var topPayer = Object.keys(payerTotals).sort(function(a, b) { return payerTotals[b] - payerTotals[a] })[0]
-    if (topPayer) insights.push({ title: '💳 Top Payer', body: '<strong>' + topPayer + '</strong> paid Rs.' + payerTotals[topPayer].toFixed(2) })
-    
+    if (topPayer) insights.push({ title: '💳 Top Payer', body: '<strong>' + escapeHtml(topPayer) + '</strong> paid Rs.' + payerTotals[topPayer].toFixed(2) })
+
     var perPerson = members.length > 0 ? total / members.length : 0
     insights.push({ title: '👥 Per Person', body: 'Each owes <strong>Rs.' + perPerson.toFixed(2) + '</strong>' })
-    
+
     if (budget > 0) {
         var pct = (total / budget) * 100
         if (pct >= 100) insights.push({ title: '🚨 Over Budget!', body: 'You exceeded by Rs.' + Math.abs(budget - total).toFixed(2) })
@@ -251,6 +298,9 @@ function generateInsights(members, expenses, total, budget) {
     return insights
 }
 
+// =====================
+// SPLIT PREVIEW
+// =====================
 function updateSplitPreview(members, amount) {
     if (!members || members.length === 0 || !amount || amount <= 0) { hideSplitPreview(); return }
     var method = document.querySelector('input[name="split"]:checked')
@@ -313,6 +363,9 @@ function hideSplitPreview() {
     if (container) container.style.display = 'none'
 }
 
+// =====================
+// RENDER FUNCTIONS
+// =====================
 function renderMembers(members) {
     var el = document.getElementById('membersGrid')
     if (!el) return
@@ -320,13 +373,13 @@ function renderMembers(members) {
     var html = ''
     members.forEach(function(m) {
         html += '<div class="member-card"><span>' + escapeHtml(m.name) + '</span>'
-        html += '<button class="btn-red mem-del-btn" data-id="' + m.id + '">Remove</button></div>'
+        html += '<button class="btn-red mem-del-btn" data-id="' + escapeHtml(String(m.id)) + '">Remove</button></div>'
     })
     el.innerHTML = html
     el.querySelectorAll('.mem-del-btn').forEach(function(btn) {
         btn.onclick = async function() {
             if (!confirm('Remove this member?')) return
-            await sb.from('members').delete().eq('id', btn.dataset.id)
+            await sb.from('members').delete().eq('id', parseInt(btn.dataset.id))
             await showGroupDetails()
         }
     })
@@ -339,16 +392,16 @@ function renderExpenses(expenses) {
     var html = ''
     expenses.forEach(function(exp) {
         html += '<div class="expense-card"><div>'
-        html += '<h4>' + (exp.category || '📌') + ' ' + escapeHtml(exp.description) + '</h4>'
-        html += '<p>Paid by ' + escapeHtml(exp.paid_by) + ' • ' + getDate(exp.created_at) + '</p>'
-        html += '</div><div class="expense-amount">Rs.' + exp.amount.toFixed(2) + '</div>'
-        html += '<button class="btn-red exp-del-btn" data-id="' + exp.id + '">Delete</button></div>'
+        html += '<h4>' + escapeHtml(exp.category || '📌') + ' ' + escapeHtml(exp.description) + '</h4>'
+        html += '<p>Paid by ' + escapeHtml(exp.paid_by) + ' • ' + escapeHtml(getDate(exp.created_at)) + '</p>'
+        html += '</div><div class="expense-amount">Rs.' + parseFloat(exp.amount).toFixed(2) + '</div>'
+        html += '<button class="btn-red exp-del-btn" data-id="' + escapeHtml(String(exp.id)) + '">Delete</button></div>'
     })
     el.innerHTML = html
     el.querySelectorAll('.exp-del-btn').forEach(function(btn) {
         btn.onclick = async function() {
             if (!confirm('Delete this expense?')) return
-            await sb.from('expenses').delete().eq('id', btn.dataset.id)
+            await sb.from('expenses').delete().eq('id', parseInt(btn.dataset.id))
             await showGroupDetails()
         }
     })
@@ -416,13 +469,16 @@ function renderChat(messages) {
             var cls = msg.sender == 'You' ? 'me' : 'other'
             html += '<div class="chat-msg ' + cls + '">'
             if (cls == 'other') html += '<div style="font-size:0.82em;font-weight:bold;margin-bottom:3px;">' + escapeHtml(msg.sender) + '</div>'
-            html += escapeHtml(msg.text) + '<div class="msg-time">' + getDate(msg.created_at) + '</div></div>'
+            html += escapeHtml(msg.text) + '<div class="msg-time">' + escapeHtml(getDate(msg.created_at)) + '</div></div>'
         }
     })
     el.innerHTML = html
     el.scrollTop = el.scrollHeight
 }
 
+// =====================
+// LISTENERS & SETUP
+// =====================
 function setupListeners() {
     document.getElementById('newGroupBtn').onclick = function() { openModal('createGroupModal') }
 
@@ -434,19 +490,20 @@ function setupListeners() {
     }
 
     document.getElementById('createGroupBtn').onclick = async function() {
-        var name = document.getElementById('groupName').value.trim()
+        var name = sanitizeText(document.getElementById('groupName').value)
         if (!name) return alert('Enter a group name')
-        
+        if (name.length > 100) return alert('Group name too long')
+
         const { data, error } = await sb
             .from('groups')
             .insert([{ name, user_id: currentUser.id }])
             .select()
-        
+
         if (error) {
             alert('Error creating group: ' + error.message)
             return
         }
-        
+
         document.getElementById('groupName').value = ''
         closeModal('createGroupModal')
         currentGroup = data[0].id
@@ -456,40 +513,43 @@ function setupListeners() {
     }
 
     document.getElementById('addMemberBtn').onclick = async function() {
-        var name = document.getElementById('memberName').value.trim()
+        var name = sanitizeText(document.getElementById('memberName').value)
         if (!name) return alert('Enter member name')
-        
+        if (name.length > 100) return alert('Member name too long')
+
         await sb.from('members').insert([{ group_id: currentGroup, name }])
-        
+
         await sb.from('messages').insert([{
             group_id: currentGroup,
             sender: 'System',
             text: name + ' joined the group',
             type: 'system'
         }])
-        
+
         document.getElementById('memberName').value = ''
         closeModal('addMemberModal')
         await showGroupDetails()
     }
 
     document.getElementById('addExpenseBtn').onclick = async function() {
-        var desc = document.getElementById('expenseDesc').value.trim()
-        var amount = parseFloat(document.getElementById('expenseAmount').value)
+        var desc = sanitizeText(document.getElementById('expenseDesc').value)
+        var amount = sanitizeNumber(document.getElementById('expenseAmount').value)
         var category = document.getElementById('expenseCategory').value
         var paidBy = document.getElementById('expensePaidBy').value
         var splitMethod = document.querySelector('input[name="split"]:checked').value
-        
+
         if (!desc) { alert('Please enter a description'); return }
+        if (desc.length > 200) { alert('Description too long'); return }
         if (!amount || amount <= 0) { alert('Please enter a valid amount'); return }
+        if (amount > 10000000) { alert('Amount too large'); return }
         if (!category) { alert('Please select a category'); return }
         if (!paidBy) { alert('Please select who paid'); return }
-        
+
         var members = await sb.from('members').select('*').eq('group_id', currentGroup)
         var memberNames = members.data.map(function(m) { return m.name })
         var splitData = getSplitData(splitMethod, memberNames, amount)
         if (!splitData) return
-        
+
         await sb.from('expenses').insert([{
             group_id: currentGroup,
             description: desc,
@@ -499,14 +559,14 @@ function setupListeners() {
             split_method: splitMethod,
             split_data: splitData
         }])
-        
+
         await sb.from('messages').insert([{
             group_id: currentGroup,
             sender: 'System',
             text: paidBy + ' added: ' + desc + ' - Rs.' + amount.toFixed(2),
             type: 'system'
         }])
-        
+
         document.getElementById('expenseDesc').value = ''
         document.getElementById('expenseAmount').value = ''
         document.getElementById('expenseCategory').value = ''
@@ -518,7 +578,7 @@ function setupListeners() {
     }
 
     document.getElementById('expenseAmount').addEventListener('input', async function() {
-        var amount = parseFloat(this.value) || 0
+        var amount = sanitizeNumber(this.value)
         if (!currentGroup) return
         var members = await sb.from('members').select('*').eq('group_id', currentGroup)
         updateSplitPreview(members.data, amount)
@@ -529,14 +589,15 @@ function setupListeners() {
         r.onchange = async function() {
             var members = await sb.from('members').select('*').eq('group_id', currentGroup)
             updateSplitConfig(members.data || [])
-            var amount = parseFloat(document.getElementById('expenseAmount').value) || 0
+            var amount = sanitizeNumber(document.getElementById('expenseAmount').value)
             updateSplitPreview(members.data, amount)
         }
     })
 
     document.getElementById('saveBudgetBtn').onclick = function() {
-        var val = parseFloat(document.getElementById('budgetAmount').value)
+        var val = sanitizeNumber(document.getElementById('budgetAmount').value)
         if (!val || val <= 0) { alert('Enter a valid budget amount'); return }
+        if (val > 100000000) { alert('Budget amount too large'); return }
         localStorage.setItem('budget_' + currentGroup, val)
         closeModal('setBudgetModal')
         showGroupDetails()
@@ -550,6 +611,9 @@ function setupListeners() {
     }
 }
 
+// =====================
+// SPLIT HELPERS
+// =====================
 function updatePaidByDropdown(members) {
     var sel = document.getElementById('expensePaidBy')
     if (!sel) return
@@ -578,7 +642,7 @@ function updateSplitConfig(members) {
                 var el = document.getElementById('pctTotal')
                 el.textContent = 'Total: ' + t.toFixed(1) + '%'
                 el.className = 'total-indicator' + (Math.abs(t - 100) > 0.01 ? ' error' : '')
-                var amount = parseFloat(document.getElementById('expenseAmount').value) || 0
+                var amount = sanitizeNumber(document.getElementById('expenseAmount').value)
                 updateSplitPreview(members, amount)
             }
         })
@@ -590,12 +654,12 @@ function updateSplitConfig(members) {
         area.innerHTML = html
         area.querySelectorAll('.member-cb').forEach(function(cb) {
             cb.onchange = function() {
-                var amount = parseFloat(document.getElementById('expenseAmount').value) || 0
+                var amount = sanitizeNumber(document.getElementById('expenseAmount').value)
                 updateSplitPreview(members, amount)
             }
         })
     } else if (method.value == 'amount') {
-        var totalAmt = parseFloat(document.getElementById('expenseAmount').value) || 0
+        var totalAmt = sanitizeNumber(document.getElementById('expenseAmount').value)
         var html = '<p style="font-size:0.9em;margin-bottom:8px;">Enter exact amount:</p>'
         members.forEach(function(m) {
             html += '<div class="split-row"><label>' + escapeHtml(m.name) + '</label>'
@@ -605,7 +669,7 @@ function updateSplitConfig(members) {
         area.innerHTML = html
         document.querySelectorAll('.amt-input').forEach(function(inp) {
             inp.oninput = function() {
-                var totalAmt = parseFloat(document.getElementById('expenseAmount').value) || 0
+                var totalAmt = sanitizeNumber(document.getElementById('expenseAmount').value)
                 var t = 0
                 document.querySelectorAll('.amt-input').forEach(function(i) { t += parseFloat(i.value) || 0 })
                 var el = document.getElementById('amtTotal')
@@ -615,7 +679,7 @@ function updateSplitConfig(members) {
             }
         })
     }
-    var amount = parseFloat(document.getElementById('expenseAmount').value) || 0
+    var amount = sanitizeNumber(document.getElementById('expenseAmount').value)
     if (amount > 0) updateSplitPreview(members, amount)
 }
 
@@ -645,18 +709,22 @@ function getSplitData(method, memberNames, totalAmount) {
     }
 }
 
+// =====================
+// CHAT
+// =====================
 async function sendMsg() {
     var inp = document.getElementById('chatInput')
-    var text = inp.value.trim()
+    var text = sanitizeText(inp.value)
     if (!text) return
-    
+    if (text.length > 500) { alert('Message too long'); return }
+
     await sb.from('messages').insert([{
         group_id: currentGroup,
         sender: 'You',
         text: text,
         type: 'user'
     }])
-    
+
     inp.value = ''
     const { data: messages } = await sb
         .from('messages')
@@ -666,34 +734,38 @@ async function sendMsg() {
     renderChat(messages || [])
 }
 
-// ========== LOGOUT FUNCTION ==========
+// =====================
+// LOGOUT
+// =====================
 function handleLogout() {
     sb.auth.signOut()
-        .then(() => {
-            window.location.href = 'auth.html'
-        })
-        .catch(() => {
-            window.location.href = 'auth.html'
-        })
-}
-// =====================================
-
-function openModal(id) { 
-    document.getElementById(id).classList.add('active') 
+        .then(function() { window.location.href = 'auth.html' })
+        .catch(function() { window.location.href = 'auth.html' })
 }
 
-function closeModal(id) { 
-    document.getElementById(id).classList.remove('active') 
+// =====================
+// MODAL HELPERS
+// =====================
+function openModal(id) {
+    document.getElementById(id).classList.add('active')
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active')
 }
 
 window.openModal = openModal
 window.closeModal = closeModal
+window.handleLogout = handleLogout
 
-window.onclick = function(e) { 
-    if (e.target.classList.contains('modal')) 
-        e.target.classList.remove('active') 
+window.onclick = function(e) {
+    if (e.target.classList.contains('modal'))
+        e.target.classList.remove('active')
 }
 
+// =====================
+// DATE HELPER
+// =====================
 function getDate(dateStr) {
     if (!dateStr) return 'Just now'
     var d = new Date(dateStr), now = new Date()
@@ -702,14 +774,4 @@ function getDate(dateStr) {
     if (diff == 1) return 'Yesterday'
     if (diff < 7) return diff + ' days ago'
     return d.toLocaleDateString()
-}
-
-function escapeHtml(str) {
-    if (!str) return ''
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;'
-        if (m === '<') return '&lt;'
-        if (m === '>') return '&gt;'
-        return m
-    })
 }
