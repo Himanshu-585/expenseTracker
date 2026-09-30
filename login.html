@@ -45,6 +45,7 @@
             flex: 1; padding: 10px; text-align: center; border-radius: 8px;
             cursor: pointer; font-weight: 600; font-size: 0.9em;
             color: var(--muted); transition: all 0.2s; border: none; background: none;
+            font-family: inherit;
         }
         .tab.active { background: white; color: var(--indigo); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .form-group { margin-bottom: 18px; }
@@ -114,7 +115,6 @@
 
         <div id="alertBox" class="alert"></div>
 
-        <!-- LOGIN -->
         <div class="form-panel active" id="loginPanel">
             <p class="panel-title">Welcome back 👋</p>
             <p class="panel-sub">Sign in to your account to continue</p>
@@ -129,7 +129,6 @@
             <button class="btn" id="loginBtn" onclick="handleLogin()">Sign In</button>
         </div>
 
-        <!-- SIGNUP -->
         <div class="form-panel" id="signupPanel">
             <p class="panel-title">Create your account</p>
             <p class="panel-sub">Start tracking group expenses today</p>
@@ -163,16 +162,22 @@
 </div>
 
 <script>
-    // Supabase configuration
+    // Supabase configuration — ANON key (matches script.js)
     const SUPABASE_URL = 'https://iqjgxhynsznhslkbuioi.supabase.co'
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxamd4aHluc3puaHNsa2J1aW9pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzgzMjUwMiwiZXhwIjoyMDg5NDA4NTAyfQ.e4m86mI03NyVqqmyRET5FxZwxeOoaFa8PMgAn0-GfCE'
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxamd4aHluc3puaHNsa2J1aW9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzI1MDIsImV4cCI6MjA4OTQwODUwMn0.3y0-kw7MqVpisfBcPPmpv8pVH47IguLn8791VcqMCLQ"
 
     const { createClient } = supabase
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    // Check if already logged in
+    // Prevent redirect loops
+    let __authRedirected = false
+
+    // If already logged in, go to index (only once)
     sb.auth.getSession().then(({ data: { session } }) => {
-        if (session) window.location.href = 'index.html'
+        if (session && !__authRedirected) {
+            __authRedirected = true
+            window.location.replace('index.html')
+        }
     })
 
     function switchTab(tab) {
@@ -200,7 +205,9 @@
     function setLoading(btnId, loading) {
         const btn = document.getElementById(btnId)
         btn.disabled = loading
-        btn.innerHTML = loading ? '<span class="btn-spinner"></span> Please wait...' : (btnId === 'loginBtn' ? 'Sign In' : 'Create Account')
+        btn.innerHTML = loading
+            ? '<span class="btn-spinner"></span> Please wait...'
+            : (btnId === 'loginBtn' ? 'Sign In' : 'Create Account')
     }
 
     async function handleLogin() {
@@ -212,7 +219,8 @@
         const { error } = await sb.auth.signInWithPassword({ email, password })
         setLoading('loginBtn', false)
         if (error) return showAlert(error.message)
-        window.location.href = 'index.html'
+        __authRedirected = true
+        window.location.replace('index.html')
     }
 
     async function handleSignup() {

@@ -6,6 +6,8 @@
     <title>Expense Tracker</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -16,14 +18,21 @@
         </header>
         <div class="main-content">
             <div class="sidebar">
-                <h2>My Groups</h2>
+                <h2>Menu</h2>
+                <nav class="nav-menu">
+                    <a href="#dashboard" class="nav-link" data-page="dashboard">🏠 Dashboard</a>
+                    <a href="#groups" class="nav-link" data-page="groups">👥 Groups</a>
+                    <a href="#expenses" class="nav-link" data-page="expenses">💰 Expenses</a>
+                    <a href="#analytics" class="nav-link" data-page="analytics">📊 Analytics</a>
+                    <a href="#profile" class="nav-link" data-page="profile">👤 Profile</a>
+                </nav>
                 <button id="newGroupBtn">+ New Group</button>
                 <div id="groupsList"></div>
             </div>
             <div class="content" id="mainContent">
                 <div class="welcome-screen">
                     <h2>👋 Welcome!</h2>
-                    <p>Create a group to start tracking expenses</p>
+                    <p>Loading...</p>
                 </div>
             </div>
         </div>
@@ -90,6 +99,7 @@
             </div>
             <div class="modal-btns">
                 <button onclick="closeModal('addExpenseModal')">Cancel</button>
+                <button id="scanReceiptBtn" style="background:#10b981;">🧾 Scan Receipt</button>
                 <button id="addExpenseBtn">Add Expense</button>
             </div>
         </div>
@@ -112,14 +122,59 @@
     <div class="modal" id="aiInsightsModal">
         <div class="modal-box" style="max-width:560px;">
             <h3>📊 Spending Insights</h3>
-            <div id="aiInsightsContent">
-                <div class="ai-loading">
-                    <div class="ai-spinner"></div>
-                    <p>Analyzing your group's expenses...</p>
-                </div>
-            </div>
+            <div id="aiInsightsContent"></div>
             <div class="modal-btns" style="margin-top:15px;">
                 <button onclick="closeModal('aiInsightsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Assistant Modal -->
+    <div class="modal" id="aiAssistantModal">
+        <div class="modal-box" style="max-width:600px;">
+            <h3>🤖 AI Financial Assistant</h3>
+            <div id="assistantChat" class="assistant-chat">
+                <div class="assistant-msg bot">Hi! Ask me anything about this group's spending.</div>
+            </div>
+            <div class="assistant-suggestions" id="assistantSuggestions"></div>
+            <div class="assistant-input-row">
+                <input type="text" id="assistantInput" placeholder="Ask a question..." maxlength="300">
+                <button id="assistantSendBtn">Send</button>
+            </div>
+            <div class="modal-btns" style="margin-top:12px;">
+                <button onclick="closeModal('aiAssistantModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Scanner Modal -->
+    <div class="modal" id="receiptModal">
+        <div class="modal-box" style="max-width:520px;">
+            <h3>🧾 Scan Receipt</h3>
+            <p style="color:#64748b;font-size:0.875em;margin-bottom:14px;">
+                Upload a receipt image. We'll extract amount, merchant, and date.
+            </p>
+            <input type="file" id="receiptFile" accept="image/*">
+            <div id="receiptPreview" style="margin-top:14px;"></div>
+            <div id="receiptProgress" style="display:none;margin-top:14px;text-align:center;">
+                <div class="ai-spinner" style="margin:0 auto 8px;"></div>
+                <p id="receiptProgressText">Processing...</p>
+            </div>
+            <div id="receiptResult" style="margin-top:14px;"></div>
+            <div class="modal-btns" style="margin-top:14px;">
+                <button onclick="closeModal('receiptModal')">Cancel</button>
+                <button id="receiptUseBtn" style="display:none;">Use These Values</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Modal -->
+    <div class="modal" id="analyticsModal">
+        <div class="modal-box" style="max-width:760px;">
+            <h3>📈 Advanced Analytics & Forecast</h3>
+            <div id="analyticsContent"></div>
+            <div class="modal-btns" style="margin-top:14px;">
+                <button onclick="closeModal('analyticsModal')">Close</button>
             </div>
         </div>
     </div>
